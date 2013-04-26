@@ -82,6 +82,43 @@ go_forward_item_cb (WbWindow *window)
   webkit_web_view_go_forward (window->web_view);
 }
 
+static void
+settings_item_cb (WbWindow *window)
+{
+  if (window->settings_dialog)
+  {
+    gtk_window_present (GTK_WINDOW (window->settings_dialog));
+    return;
+  }
+
+  window->settings_dialog = wb_settings_dialog_new (
+                              webkit_web_view_get_settings (
+                                window->web_view));
+  gtk_window_set_transient_for (GTK_WINDOW (window->settings_dialog),
+                                GTK_WINDOW (window));
+  g_object_add_weak_pointer (G_OBJECT (window->settings_dialog),
+                             (gpointer *) &window->settings_dialog);
+}
+
+static void
+web_view_uri_changed (WebKitWebView *web_view,
+                      GParamSpec    *pspec,
+                      WbWindow      *window)
+{
+  gtk_entry_set_text (GTK_ENTRY (window->uri_entry),
+                      webkit_web_viewn_get_uri);
+}
+
+static void
+web_view_title_changed (WebKitWebView *web_view,
+                        GParamSpec    *pspec,
+                        WbWindow      *window)
+{
+  const gchar *title = webkit_web_view_get_title (web_view);
+  gtk_window_set_title (GTK_WINDOW (window),
+                        title ? title : default_window_title);
+}
+
 GtkWidget*
 wb_window_new (WebKitWebView *view, GtkWindow *parent)
 {

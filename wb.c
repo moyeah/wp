@@ -254,11 +254,12 @@ main (int argc, char *argv[])
 
   if (uri_arguments)
   {
-    for (int i = 0; uri_arguments[i]; i++)
+    int i;
+    for (i = 0; uri_arguments[i]; i++)
       create_wb_window (uri_arguments[i], webkit_settings);
   }
   else
-    create_wb_window ("https://www.google.pt", webkit_setttings);
+    create_wb_window ("https://www.google.pt", webkit_settings);
 
   gtk_main ();
 
