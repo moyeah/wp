@@ -4,7 +4,7 @@
 
 static const gchar **uri_arguments = NULL;
 
-static const GOptionEntry command_line_opt[] = 
+static const GOptionEntry command_line_options[] = 
 {
   {
      G_OPTION_REMAINGS, 0, 0,
@@ -220,11 +220,13 @@ main (int argc, char *argv[])
   gtk_init (&argc, &argv);
 
   GOptionContext *context = g_option_context_new (NULL);
-  g_option_context_add_main_entries (context, commandLineOptions, 0);
-  g_option context_add_group (context, gtk_get_option_group (TRUE));
+  g_option_context_add_main_entries (context,
+                                     command_line_options, 0);
 
-  WebKitSettings *webkitSettings = webkit_settings_new ();
-  webkit_setttings_set_enable_developer_extras (webkitSettings, TRUE);
+  g_option_context_add_group (context, gtk_get_option_group (TRUE));
+
+  WebKitSettings *webkit_settings = webkit_settings_new ();
+  webkit_setttings_set_enable_developer_extras (webkit_settings, TRUE);
   if (!add_settings_group_to_context (context, webkit_settings))
   {
     g_object_unref (webkit_settings);

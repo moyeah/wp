@@ -1,4 +1,7 @@
+#include <string.h>
 #include <webkit2/webkit2.h>
+
+#include "wb_window.h"
 
 enum
 {
@@ -17,23 +20,23 @@ struct _WbWindow
   GtkWidget *forward_item;
   GtkWidget *status_label;
   GtkWidget *settings_dialog;
-  GtkWidget *download_bar;
+  GtkWidget *downloads_bar;
 
   WebKitWebView *web_view;
 
   GdkPixbuf *favicon;
 
 #if GTK_CHECK_VERSION (3, 2, 0)
-  GtkWidget *full_screen_message_label;
+  GtkWidget *fullscreen_message_label;
 
-  guint full_screen_message_label_id;
+  guint fullscreen_message_label_id;
 #endif
 };
 
 struct _WbWindowClass
 {
   GtkWindowClass parent;
-}
+};
 
 static const gchar *default_window_title = "WB";
 static const gint default_window_width = 800;
@@ -71,19 +74,19 @@ ok_item_cb (WbWindow *window)
 }
 
 static void
-go_back_item_cb (WbWindow *window)
+back_item_clicked_cb (WbWindow *window)
 {
   webkit_web_view_go_back (window->web_view);
 }
 
 static void
-go_forward_item_cb (WbWindow *window)
+forward_item_clicked_cb (WbWindow *window)
 {
   webkit_web_view_go_forward (window->web_view);
 }
 
 static void
-settings_item_cb (WbWindow *window)
+settings_item_clicked_cb (WbWindow *window)
 {
   if (window->settings_dialog)
   {
@@ -101,33 +104,270 @@ settings_item_cb (WbWindow *window)
 }
 
 static void
-web_view_uri_changed (WebKitWebView *web_view,
-                      GParamSpec    *pspec,
-                      WbWindow      *window)
+web_view_notify_uri_cb (WebKitWebView *web_view,
+                        GParamSpec    *pspec,
+                        WbWindow      *window)
 {
   gtk_entry_set_text (GTK_ENTRY (window->uri_entry),
-                      webkit_web_viewn_get_uri);
+                      webkit_web_view_get_uri (web_view));
 }
 
 static void
-web_view_title_changed (WebKitWebView *web_view,
-                        GParamSpec    *pspec,
-                        WbWindow      *window)
+web_view_notify_title_cb (WebKitWebView *web_view,
+                          GParamSpec    *pspec,
+                          WbWindow      *window)
 {
   const gchar *title = webkit_web_view_get_title (web_view);
   gtk_window_set_title (GTK_WINDOW (window),
                         title ? title : default_window_title);
 }
 
-GtkWidget*
-wb_window_new (WebKitWebView *view, GtkWindow *parent)
+static gboolean
+reset_entry_progress (GtkEntry *entry)
 {
-  g_return_val_if_fail (WEBKIT_IS_WEB_VIEW (view), 0);
+  gtk_entry_set_progress_fraction (entry, 0);
+  return FALSE;
+}
 
-  return GTK_WIDGET (g_object_new (WB_WINDOW_TYPE,
-                                   "transient-for", parent,
-                                   "type", GTK_WINDOW_TOPLEVEL,
-                                   "view", view, NULL));
+static void
+web_view_notify_estimated_load_progress_cb (WebKitWebView *web_view,
+                                            GParamSpec    *pspec,
+                                            WbWindow      *window)
+{
+  gdouble progress = webkit_web_view_get_estimated_load_progress (web_view);
+  gtk_entry_set_progress_fraction (GTK_ENTRY (window->uri_entry),
+                                   progress);
+  if (progress == 1.0)
+    g_timeout_add (500, (GSourceFunc) reset_entry_progress,
+                   window->uri_entry);
+}
+
+static void
+web_view_download_started_cb (WebKitWebContext *web_context,
+                              WebKitDownload   *download,
+                              WbWindow         *window)
+{
+  if (!window->downloads_bar)
+  {
+    window->downloads_bar = wb_downloads_bar_new ();
+    gtk_box_pack_start (GTK_BOX (window->main_box),
+                        window->downloads_bar,
+                        FALSE, FALSE, 0);
+    gtk_box_reorder_child (GTK_BOX (window->main_box),
+                           window->downloads_bar, 0);
+    g_object_add_weak_pointer (G_OBJECT (window->downloads_bar),
+                               (gpointer *) &(window->downloads_bar));
+  }
+
+  wb_downloads_bar_add_download (WB_DOWNLOADS_BAR (window->downloads_bar),
+                                 download);
+}
+
+static void
+menu_item_select_cb (WbWindow    *window,
+                     GtkMenuItem *item)
+{
+  GtkAction *action = gtk_activatable_get_related_action (
+                        GTK_ACTIVATABLE (item));
+  wb_window_set_status_text (window,
+                             action ? gtk_action_get_name (action) : NULL);
+}
+
+static void
+action_activate_cb (WbWindow  *window,
+                    GtkAction *action)
+{
+  WebKitBackForwardListItem *item =
+    g_object_get_data (G_OBJECT (action),
+                       "back-forward-list-item");
+  if (!item)
+    return;
+
+  webkit_web_view_go_to_back_forward_list_item (window->web_view, item);
+}
+
+static GtkWidget*
+wb_window_create_back_forward_menu (WbWindow *window,
+                                    GList    *list)
+{
+  if (!list)
+    return NULL;
+
+  GtkWidget *menu = gtk_menu_new ();
+  GList *list_item;
+
+  for (list_item = list; list_item; list_item = g_list_next (list_item))
+  {
+    WebKitBackForwardListItem *item =
+      (WebKitBackForwardListItem *) list_item->data;
+    const gchar *uri = webkit_back_forward_list_item_get_uri (item);
+    const gchar *title = webkit_back_forward_list_item_get_title (item);
+
+    GtkAction *action = gtk_action_new (uri, title, NULL, NULL);
+    g_object_set_data_full (G_OBJECT (action),
+                            "back-forward-list-item",
+                            g_object_ref (item), g_object_unref);
+    g_signal_connect_swapped (action, "activate",
+                              G_CALLBACK (action_activate_cb),
+                              (gpointer) window);
+
+    GtkWidget *menu_item = gtk_action_create_menu_item (action);
+    g_signal_connect_swapped (menu_item, "select",
+                              G_CALLBACK (menu_item_select_cb),
+                              (gpointer) window);
+    g_object_unref (action);
+
+    gtk_menu_shell_prepend (GTK_MENU_SHELL (menu), menu_item);
+  }
+
+  g_signal_connect (menu, "hide",
+                    G_CALLBACK (reset_status_text),
+                    (gpointer) window);
+
+  return menu;
+}
+
+static void
+wb_window_update_navigation_actions (WbWindow              *window,
+                                     WebKitBackForwardList *back_forward_list)
+{
+  gtk_widget_set_sensitive (window->back_item,
+                            webkit_web_view_can_go_back (window->web_view));
+  gtk_widget_set_sensitive (window->forward_item,
+                            webkit_web_view_can_go_forward (window->web_view));
+
+  GList *list = webkit_back_forward_list_get_back_list_with_limit (list, 10);
+  gtk_menu_tool_button_set_menu (
+    GTK_MENU_TOOL_BUTTON (window->back_item),
+                          wb_window_create_back_forward_menu (window,
+                                                              list));
+  g_list_free (list);
+
+  list = webkit_back_forward_list_get_forward_list_with_limit (list, 10);
+  gtk_menu_tool_button_set_menu (
+    GTK_MENU_TOOL_BUTTON (window->forward_item),
+                          wb_window_create_back_forward_menu (window,
+                                                              list));
+  g_list_free (list);
+}
+
+static void
+back_forward_list_changed_cb (WebKitBackForwardList *back_forward_list,
+                              WebKitBackForwardList *item_added,
+                              GList                 *items_removed,
+                              WbWindow              *window)
+{
+  wb_window_update_navigation_actions (window, back_forward_list);
+}
+
+static void
+geolocation_cb (GtkDialog               *dialog,
+                gint                     response,
+                WebKitPermissionRequest *request)
+{
+  switch (response)
+  {
+    case GTK_RESPONSE_YES:
+      wekit_permission_request_allow (request);
+      break;
+    default:
+      webkit_permission_request_deny (request);
+      break;
+  }
+
+  gtk_widget_destroy (GTK_WIDGET (dialog));
+  g_object_unref (request);
+}
+
+static void
+web_view_ready_to_show_cb (WebKitWebView *web_view, WbWindow *window)
+{
+  WebKitWindowProperties *window_properties =
+    webkit_web_view_get_window_properties (web_view);
+
+  GdkRectangle geometry;
+  webkit_window_properties_get_geometry (window_properties,
+                                         &geometry);
+  if (geometry.x >= 0 && geometry.y >= 0)
+    gtk_window_move (GTK_WINDOW (window), geometry.x, geometry.y);
+  if (geometry.width > 0 && geometry.height > 0)
+    gtk_window_resize (GTK_WINDOW (window),
+                       geometry.width,
+                       geometry.height);
+
+  if (!webkit_window_properties_get_toolbar_visible (window_properties))
+    gtk_widget_hide (window->toolbar);
+  else if (!webkit_window_properties_get_location_bar_visible (
+             window_properties))
+    gtk_widget_hide (window->uri_entry);
+
+  if (!webkit_window_properties_get_resizable (window_properties))
+    gtk_window_set_resizable (GTK_WINDOW (window), FALSE);
+}
+
+static void
+web_view_run_as_modal_cb (WebKitWebView *web_view, WbWindow *window)
+{
+  gtk_window_set_modal (GTK_WINDOW (window), TRUE);
+}
+
+static void
+web_view_close_cb (WebKitWebView *web_view, WbWindow *window)
+{
+  gtk_widget_destroy (GTK_WIDGET (window));
+}
+
+#if GTK_CHECK_VERSION (3, 2, 0)
+static gboolean
+fullscreen_message_timeout_cb (WbWindow *window)
+{
+  gtk_widget_hide (window->fullscreen_message_label);
+  window->fullscreen_message_label_id = 0;
+  return FALSE;
+}
+#endif
+
+static gboolean
+web_view_enter_fullscreen_cb (WebKitWebView *web_view, WbWindow *window)
+{
+#if GTK_CHECK_VERSION (3, 2, 0)
+  const gchar *title_or_uri = webkit_web_view_get_title (window->web_view);
+  if (!title_or_uri)
+    title_or_uri = webkit_web_view_get_uri (window->web_view);
+
+  gchar *message = g_strdup_printf (
+                     "%s is now full screen. Press ESQ of f to exist.",
+                     title_or_uri);
+  gtk_label_set_text (GTK_LABEL (window->fullscreen_message_label),
+                      message);
+  g_free (message);
+
+  window->fullscreen_message_label_id =
+    g_timeout_add_seconds (2, (GSourceFunc) fullscreen_message_timeout_cb,
+                           window);
+#endif
+
+  gtk_widget_hide (window->toolbar);
+
+  return FALSE;
+}
+
+static gboolean
+web_view_leave_fullscreen_cb (WebKitWebView *web_view, WbWindow *window)
+{
+#if GTK_CHECK_VERSION (3, 2, 0)
+  if (window->fullscreen_message_label_id)
+  {
+    g_source_remove (window->fullscreen_message_label_id);
+    window->fullscreen_message_label_id = 0;
+  }
+
+  gtk_widget_hide (window->fullscreen_message_label);
+#endif
+
+  gtk_widget_show (window->toolbar);
+
+  return FALSE;
 }
 
 static GtkWidget*
@@ -182,9 +422,9 @@ web_view_decide_policy_cb (WebKitWebView            *web_view,
     return FALSE;
 
   WebKitWebView *new_web_view = WEBKIT_WEB_VIEW (
-    webkit_web_view_new_with_context (web_web_view_get_context (web_view)));
-  webkit_web_view_set_settings (new_web_view, webkit_web_view_get_settings (
-    web_view));
+    webkit_web_view_new_with_context (webkit_web_view_get_context (web_view)));
+  webkit_web_view_set_settings (
+    new_web_view, webkit_web_view_get_settings (web_view));
 
   GtkWidget *new_window = wb_window_new (new_web_view, GTK_WINDOW (window));
   webkit_web_view_load_request (new_web_view,
@@ -197,9 +437,9 @@ web_view_decide_policy_cb (WebKitWebView            *web_view,
 }
 
 static gboolean
-web_view_decide_permission_request_cb (WebKitWebView           *web_view,
-                                       WebKitPermissionRequest *request,
-                                       WbWindow                *window)
+web_view_permission_request_cb (WebKitWebView           *web_view,
+                                WebKitPermissionRequest *request,
+                                WbWindow                *window)
 {
   if (!WEBKIT_IS_GEOLOCATION_PERMISSION_REQUEST (request))
     return FALSE;
@@ -242,7 +482,7 @@ web_view_notify_favicon_cb (GObject *g_object, GParamSpec *param_spec,
 {
   GdkPixbuf *favicon = NULL;
 
-  cairo_surface_t *surface = webkit_web_view_get_favicon (window->wev_view);
+  cairo_surface_t *surface = webkit_web_view_get_favicon (window->web_view);
 
   if (surface)
   {
@@ -269,8 +509,8 @@ wb_window_finalize (GObject *g_object)
   }
 
 #if GTK_CHECK_VERSION (3, 2, 0)
-  if (window->full_screen_message_label_id)
-    g_source_remove (window->full_screen_message_label_id);
+  if (window->fullscreen_message_label_id)
+    g_source_remove (window->fullscreen_message_label_id);
 #endif
 
   G_OBJECT_CLASS (wb_window_parent_class)->finalize (g_object);
@@ -323,7 +563,7 @@ wb_window_init (WbWindow *window)
   gtk_window_set_title (GTK_WINDOW (window), default_window_title);
   gtk_window_set_default_size (GTK_WINDOW (window),
                                default_window_width,
-                               defautl_window_height);
+                               default_window_height);
 
   window->uri_entry = gtk_entry_new ();
   gtk_entry_set_icon_activatable (GTK_ENTRY (window->uri_entry),
@@ -387,7 +627,7 @@ wb_window_init (WbWindow *window)
 static void
 wb_window_constructed (GObject *g_object)
 {
-  WbWindow = WB_WINDOW (g_object);
+  WbWindow *window = WB_WINDOW (g_object);
 
   g_signal_connect (window->web_view, "notify::uri",
                     G_CALLBACK (web_view_notify_uri_cb),
@@ -440,8 +680,8 @@ wb_window_constructed (GObject *g_object)
 
   WebKitBackForwardList *back_forward_list =
     webkit_web_view_get_back_forward_list (window->web_view);
-  g_signal_connect (back_forward_list, "changed"
-                    G_CALLBACK (web_view_back_forward_list_cb),
+  g_signal_connect (back_forward_list, "changed",
+                    G_CALLBACK (back_forward_list_changed_cb),
                     (gpointer) window);
 
 #if GTK_CHECK_VERSION (3, 2, 0)
@@ -459,12 +699,12 @@ wb_window_constructed (GObject *g_object)
 
   gtk_container_add (GTK_CONTAINER (overlay), GTK_WIDGET (window->web_view));
 
-  window->full_screen_message_label = gtk_label_new (NULL);
-  gtk_widget_set_halign (window->full_screen_message_label, GTK_ALIGN_CENTER);
-  gtk_widget_set_valign (window->full_screen_message_label, GTK_ALIGN_CENTER);
-  gtk_widget_set_no_show_all (window->full_screen_message_label, TRUE);
+  window->fullscreen_message_label = gtk_label_new (NULL);
+  gtk_widget_set_halign (window->fullscreen_message_label, GTK_ALIGN_CENTER);
+  gtk_widget_set_valign (window->fullscreen_message_label, GTK_ALIGN_CENTER);
+  gtk_widget_set_no_show_all (window->fullscreen_message_label, TRUE);
   gtk_overlay_add_overlay (GTK_OVERLAY (overlay),
-                           window->full_screen_message_label);
+                           window->fullscreen_message_label);
 #else
   gtk_box_pack_start (GTK_BOX (window->main_box),
                       GTK_WIDGET (window->web_view),
@@ -477,7 +717,7 @@ wb_window_class_init (WbWindowClass *klass)
 {
   GObjectClass *g_object_class = G_OBJECT_CLASS (klass);
 
-  g_object_class->constructed = wb_window_contructed;
+  g_object_class->constructed = wb_window_constructed;
   g_object_class->get_property = wb_window_get_property;
   g_object_class->set_property = wb_window_set_property;
   g_object_class->finalize = wb_window_finalize;
@@ -489,7 +729,18 @@ wb_window_class_init (WbWindowClass *klass)
                                      "The web view of this window",
                                       WEBKIT_TYPE_WEB_VIEW,
                                       G_PARAM_READWRITE ||
-                                        G_CONSTRUCT_ONLY));
+                                        G_PARAM_CONSTRUCT_ONLY));
+}
+
+GtkWidget*
+wb_window_new (WebKitWebView *web_view, GtkWindow *parent)
+{
+  g_return_val_if_fail (WEBKIT_IS_WEB_VIEW (web_view), 0);
+
+  return GTK_WIDGET (g_object_new (WB_TYPE_WINDOW,
+                                   "transient-for", parent,
+                                   "type", GTK_WINDOW_TOPLEVEL,
+                                   "view", web_view, NULL));
 }
 
 WebKitWebView*
