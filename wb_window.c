@@ -270,7 +270,7 @@ dialog_geolocation_response_cb (GtkDialog               *dialog,
   switch (response)
   {
     case GTK_RESPONSE_YES:
-      wekit_permission_request_allow (request);
+      webkit_permission_request_allow (request);
       break;
     default:
       webkit_permission_request_deny (request);
@@ -299,7 +299,7 @@ web_view_ready_to_show_cb (WebKitWebView *web_view, WbWindow *window)
 
   if (!webkit_window_properties_get_toolbar_visible (window_properties))
     gtk_widget_hide (window->toolbar);
-  else if (!webkit_window_properties_get_location_bar_visible (
+  else if (!webkit_window_properties_get_locationbar_visible (
              window_properties))
     gtk_widget_hide (window->uri_entry);
 
@@ -378,7 +378,7 @@ web_view_create_cb (WebKitWebView *web_view,
 {
   WebKitWebView *new_web_view = WEBKIT_WEB_VIEW (
                                   webkit_web_view_new_with_context (
-                                    webkit_web_view_get_contect (web_view)));
+                                    webkit_web_view_get_context (web_view)));
 
   GtkWidget *new_window = wb_window_new (new_web_view, GTK_WINDOW (window));
   g_signal_connect (new_web_view, "ready-to-show",
@@ -479,12 +479,30 @@ web_view_mouse_target_changed_cb (WebKitWebView       *web_view,
 }
 
 static void
+update_uri_entry_icon (WbWindow *window)
+{
+  GtkEntry *entry = GTK_ENTRY (window->uri_entry);
+
+  if (window->favicon)
+    gtk_entry_set_icon_from_pixbuf (entry, GTK_ENTRY_ICON_PRIMARY,
+                                    window->favicon);
+  else
+    gtk_entry_set_icon_from_stock (entry, GTK_ENTRY_ICON_PRIMARY,
+                                   GTK_STOCK_NEW);
+}
+
+static void
 web_view_notify_favicon_cb (GObject *g_object, GParamSpec *param_spec,
                             WbWindow *window)
 {
   GdkPixbuf *favicon = NULL;
 
+/* TODO */
+  cairo_surface_t *surface;
+/*
   cairo_surface_t *surface = webkit_web_view_get_favicon (window->web_view);
+*/
+/* END TODO */
 
   if (surface)
   {
@@ -604,9 +622,9 @@ wb_window_init (WbWindow *window)
   GtkToolItem *item = gtk_tool_button_new_from_stock (
                         GTK_STOCK_PREFERENCES);
   gtk_toolbar_insert (GTK_TOOLBAR (window->toolbar), item, -1);
-  g_signal_connect_swapperd (item, "clicked",
-                             G_CALLBACK (settings_item_clicked_cb),
-                             window);
+  g_signal_connect_swapped (item, "clicked",
+                            G_CALLBACK (settings_item_clicked_cb),
+                            window);
 
   item = gtk_tool_item_new ();
   gtk_tool_item_set_expand (item, TRUE);

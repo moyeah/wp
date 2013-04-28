@@ -1,3 +1,4 @@
+#include <string.h>
 #include <errno.h>
 #include <webkit2/webkit2.h>
 
@@ -61,16 +62,21 @@ parse_option_entry_callback (const gchar    *option_name_full,
   switch (G_PARAM_SPEC_VALUE_TYPE (spec))
   {
     case G_TYPE_BOOLEAN:
+    {
       gboolean property_value = !(value &&
                                     g_ascii_strcasecmp (value, "true") &&
 				    strcmp (value, "1"));
       g_object_set (G_OBJECT (webkit_settings), option_name,
                     property_value, NULL);
       break;
+    }
     case G_TYPE_STRING:
+    {
       g_object_set (G_OBJECT (webkit_settings), option_name, value, NULL);
       break;
+    }
     case G_TYPE_INT:
+    {
       glong property_value;
       gchar *end;
 
@@ -94,7 +100,9 @@ parse_option_entry_callback (const gchar    *option_name_full,
       g_object_set (G_OBJECT (webkit_settings), option_name,
                     property_value, NULL);
       break;
+    }
     case G_TYPE_FLOAT:
+    {
       gdouble property_value;
       gchar *end;
 
@@ -118,6 +126,7 @@ parse_option_entry_callback (const gchar    *option_name_full,
       g_object_set (G_OBJECT (webkit_settings), option_name,
                     property_value, NULL);
       break;
+    }
     default:
       g_assert_not_reached ();
   }
@@ -228,7 +237,7 @@ main (int argc, char *argv[])
   g_option_context_add_group (context, gtk_get_option_group (TRUE));
 
   WebKitSettings *webkit_settings = webkit_settings_new ();
-  webkit_setttings_set_enable_developer_extras (webkit_settings, TRUE);
+  webkit_settings_set_enable_developer_extras (webkit_settings, TRUE);
   if (!add_settings_group_to_context (context, webkit_settings))
   {
     g_object_unref (webkit_settings);
@@ -250,8 +259,11 @@ main (int argc, char *argv[])
   g_setenv ("WEBKIT_INSPECTOR_PATH", WEBKIT_EXEC_PATH "resources/inspector",
             FALSE);
 #endif /* WEBKIT_EXEC_PATH */
+
+#ifdef WEBKIT_INJECTED_BUNDLE_PATH
   g_setenv ("WEBKIT_INJECTED_BUNDLE_PATH", WEBKIT_INJECTED_BUNDLE_PATH,
             FALSE);
+#endif /* WEBKIT_INJECTED_BUNDLE_PATH */
 
   webkit_web_context_set_favicon_database_directory (
     webkit_web_context_get_default (), NULL);
