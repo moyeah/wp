@@ -2,10 +2,12 @@
 #include <webkit2/webkit2.h>
 
 #include "wb_window.h"
+#include "wb_downloads_bar.h"
 
 enum
 {
   PROP_0,
+
   PROP_VIEW
 };
 
@@ -43,7 +45,7 @@ static const gint default_window_width = 800;
 static const gint default_window_height = 600;
 static gint window_count = 0;
 
-G_DEFINE_TYPE (WbWindow, wb_window, GTK_TYPE_WINDOW);
+G_DEFINE_TYPE (WbWindow, wb_window, GTK_TYPE_WINDOW)
 
 static void
 wb_window_set_status_text (WbWindow *window, const gchar *text)
@@ -209,12 +211,12 @@ wb_window_create_back_forward_menu (WbWindow *window,
                             g_object_ref (item), g_object_unref);
     g_signal_connect_swapped (action, "activate",
                               G_CALLBACK (action_activate_cb),
-                              (gpointer) window);
+                              window);
 
     GtkWidget *menu_item = gtk_action_create_menu_item (action);
     g_signal_connect_swapped (menu_item, "select",
                               G_CALLBACK (menu_item_select_cb),
-                              (gpointer) window);
+                              window);
     g_object_unref (action);
 
     gtk_menu_shell_prepend (GTK_MENU_SHELL (menu), menu_item);
@@ -222,7 +224,7 @@ wb_window_create_back_forward_menu (WbWindow *window,
 
   g_signal_connect (menu, "hide",
                     G_CALLBACK (reset_status_text),
-                    (gpointer) window);
+                    window);
 
   return menu;
 }
@@ -261,9 +263,9 @@ back_forward_list_changed_cb (WebKitBackForwardList *back_forward_list,
 }
 
 static void
-geolocation_cb (GtkDialog               *dialog,
-                gint                     response,
-                WebKitPermissionRequest *request)
+dialog_geolocation_response_cb (GtkDialog               *dialog,
+                                gint                     response,
+                                WebKitPermissionRequest *request)
 {
   switch (response)
   {
@@ -381,13 +383,13 @@ web_view_create_cb (WebKitWebView *web_view,
   GtkWidget *new_window = wb_window_new (new_web_view, GTK_WINDOW (window));
   g_signal_connect (new_web_view, "ready-to-show",
                     G_CALLBACK (web_view_ready_to_show_cb),
-                    (gpointer) new_window);
+                    new_window);
   g_signal_connect (new_web_view, "run-as-modal",
                     G_CALLBACK (web_view_run_as_modal_cb),
-                    (gpointer) new_window);
+                    new_window);
   g_signal_connect (new_web_view, "close",
                     G_CALLBACK (web_view_close_cb),
-                    (gpointer) new_window);
+                    new_window);
 
   return GTK_WIDGET (new_web_view);
 }
@@ -437,7 +439,7 @@ web_view_decide_policy_cb (WebKitWebView            *web_view,
 }
 
 static gboolean
-web_view_permission_request_cb (WebKitWebView           *web_view,
+web_view_premission_request_cb (WebKitWebView           *web_view,
                                 WebKitPermissionRequest *request,
                                 WbWindow                *window)
 {
@@ -454,7 +456,7 @@ web_view_permission_request_cb (WebKitWebView           *web_view,
   gtk_message_dialog_format_secondary_text (GTK_MESSAGE_DIALOG (dialog),
                                             "Allow geolocation request?");
   g_signal_connect (dialog, "response",
-                    G_CALLBACK (geolocation_request_dialog_cb),
+                    G_CALLBACK (dialog_geolocation_response_cb),
                     g_object_ref (request));
 
   return TRUE;
@@ -571,7 +573,7 @@ wb_window_init (WbWindow *window)
   update_uri_entry_icon (window);
   g_signal_connect_swapped (window->uri_entry, "activate",
                             G_CALLBACK (uri_entry_activate_cb),
-                            (gpointer) window);
+                            window);
 
   window->toolbar = gtk_toolbar_new ();
   gtk_toolbar_set_style (GTK_TOOLBAR (window->toolbar), GTK_TOOLBAR_ICONS);
@@ -586,7 +588,7 @@ wb_window_init (WbWindow *window)
                       GTK_TOOL_ITEM (window->back_item), -1);
   g_signal_connect_swapped (window->back_item, "clicked",
                             G_CALLBACK (back_item_clicked_cb),
-                            (gpointer) window);
+                            window);
 
   window->forward_item = GTK_WIDGET (
                           gtk_menu_tool_button_new_from_stock (
@@ -597,14 +599,14 @@ wb_window_init (WbWindow *window)
                       GTK_TOOL_ITEM (window->forward_item), -1);
   g_signal_connect_swapped (window->forward_item, "clicked",
                             G_CALLBACK (forward_item_clicked_cb),
-                            (gpointer) window);
+                            window);
 
   GtkToolItem *item = gtk_tool_button_new_from_stock (
                         GTK_STOCK_PREFERENCES);
   gtk_toolbar_insert (GTK_TOOLBAR (window->toolbar), item, -1);
   g_signal_connect_swapperd (item, "clicked",
                              G_CALLBACK (settings_item_clicked_cb),
-                             (gpointer) window);
+                             window);
 
   item = gtk_tool_item_new ();
   gtk_tool_item_set_expand (item, TRUE);
@@ -615,7 +617,7 @@ wb_window_init (WbWindow *window)
   gtk_toolbar_insert (GTK_TOOLBAR (window->toolbar), item, -1);
   g_signal_connect_swapped (item, "clicked",
                             G_CALLBACK (ok_item_cb),
-                            (gpointer) window);
+                            window);
 
   window->main_box = gtk_box_new (GTK_ORIENTATION_VERTICAL, 0);
   gtk_box_pack_start (GTK_BOX (window->main_box), window->toolbar,
@@ -631,58 +633,58 @@ wb_window_constructed (GObject *g_object)
 
   g_signal_connect (window->web_view, "notify::uri",
                     G_CALLBACK (web_view_notify_uri_cb),
-                    (gpointer) window);
+                    window);
 
   g_signal_connect (window->web_view, "notify::estimated-load-progress",
                     G_CALLBACK (web_view_notify_estimated_load_progress_cb),
-                    (gpointer) window);
+                    window);
 
   g_signal_connect (window->web_view, "notify::title",
                     G_CALLBACK (web_view_notify_title_cb),
-                    (gpointer) window);
+                    window);
 
   g_signal_connect (window->web_view, "notify::favicon",
                     G_CALLBACK (web_view_notify_favicon_cb),
-                    (gpointer) window);
+                    window);
 
   g_signal_connect (window->web_view, "create",
                     G_CALLBACK (web_view_create_cb),
-                    (gpointer) window);
+                    window);
 
   g_signal_connect (window->web_view, "load-failed",
                     G_CALLBACK (web_view_load_failed_cb),
-                    (gpointer) window);
+                    window);
 
   g_signal_connect (window->web_view, "decide-policy",
                     G_CALLBACK (web_view_decide_policy_cb),
-                    (gpointer) window);
+                    window);
 
   g_signal_connect (window->web_view, "premission-request",
                     G_CALLBACK (web_view_premission_request_cb),
-                    (gpointer) window);
+                    window);
 
   g_signal_connect (window->web_view, "mouse-target-changed",
                     G_CALLBACK (web_view_mouse_target_changed_cb),
-                    (gpointer) window);
+                    window);
 
   g_signal_connect (window->web_view, "enter-fullscreen",
                     G_CALLBACK (web_view_enter_fullscreen_cb),
-                    (gpointer) window);
+                    window);
 
   g_signal_connect (window->web_view, "leave-fullscreen",
                     G_CALLBACK (web_view_leave_fullscreen_cb),
-                    (gpointer) window);
+                    window);
 
   g_signal_connect (webkit_web_view_get_context (window->web_view),
                     "download-started",
                     G_CALLBACK (web_view_download_started_cb),
-                    (gpointer) window);
+                    window);
 
   WebKitBackForwardList *back_forward_list =
     webkit_web_view_get_back_forward_list (window->web_view);
   g_signal_connect (back_forward_list, "changed",
                     G_CALLBACK (back_forward_list_changed_cb),
-                    (gpointer) window);
+                    window);
 
 #if GTK_CHECK_VERSION (3, 2, 0)
   GtkWidget *overlay = gtk_overlay_new ();

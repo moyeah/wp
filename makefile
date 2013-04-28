@@ -1,4 +1,5 @@
-SOURCES = wb_window.c \
+SOURCES = wb_downloads_bar.c \
+          wb_window.c \
           wb.c
 OBJS    = ${SOURCES:.c=.o}
 CFLAGS  = $(shell pkg-config webkit2gtk-3.0 --cflags)

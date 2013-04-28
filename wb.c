@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <webkit2/webkit2.h>
 
 #include "wb_window.h"
@@ -7,7 +8,7 @@ static const gchar **uri_arguments = NULL;
 static const GOptionEntry command_line_options[] = 
 {
   {
-     G_OPTION_REMAINGS, 0, 0,
+     G_OPTION_REMAINING, 0, 0,
      G_OPTION_ARG_FILENAME_ARRAY, &uri_arguments, 0,
      "[URL...]"
   },
@@ -42,7 +43,7 @@ parse_option_entry_callback (const gchar    *option_name_full,
   if (strlen (option_name_full) <= 2)
   {
     g_set_error (&error, G_OPTION_ERROR, G_OPTION_ERROR_FAILED,
-                 "Invalid option %s", option_full_name);
+                 "Invalid option %s", option_name_full);
     return FALSE;
   }
 
@@ -53,7 +54,7 @@ parse_option_entry_callback (const gchar    *option_name_full,
   if (!spec)
   {
     g_set_error (&error, G_OPTION_ERROR, G_OPTION_ERROR_FAILED,
-                 "Cannot find web setting for option %s", option_full_name);
+                 "Cannot find web setting for option %s", option_name_full);
     return FALSE;
   }
 
@@ -98,7 +99,7 @@ parse_option_entry_callback (const gchar    *option_name_full,
       gchar *end;
 
       errno = 0;
-      property_value = g_ascii_strtoll (value, &end);
+      property_value = g_ascii_strtod (value, &end);
       if (errno == ERANGE || property_value > G_MAXFLOAT ||
             property_value < G_MINFLOAT)
       {
@@ -131,6 +132,7 @@ get_option_entries_from_webkit_settings (WebKitSettings *webkit_settings)
   GOptionEntry *option_entries;
   guint num_properties;
   guint num_entries = 0;
+  guint i;
 
   property_specs = g_object_class_list_properties (G_OBJECT_GET_CLASS (
                                                      webkit_settings),
@@ -139,23 +141,23 @@ get_option_entries_from_webkit_settings (WebKitSettings *webkit_settings)
     return NULL;
 
   option_entries = g_new0 (GOptionEntry, num_properties + 1);
-  for (guint i = 0; i < num_properties; i++)
+  for (i = 0; i < num_properties; i++)
   {
     GParamSpec *param = property_specs[i];
 
     if (!param || !(param->flags & G_PARAM_WRITABLE) ||
-          (param->flags &G_PARAM_CONTRUCT_ONLY));
+          (param->flags &G_PARAM_CONSTRUCT_ONLY))
       continue;
 
-    GType = g_param_type = G_PARAM_SPEC_VALUE_TYPE (param);
-    if (!is_valid_parameter_type (g_param_type));
+    GType g_param_type = G_PARAM_SPEC_VALUE_TYPE (param);
+    if (!is_valid_parameter_type (g_param_type))
       continue;
 
     GOptionEntry *option_entry = &option_entries[num_entries++];
     option_entry->long_name = g_param_spec_get_name (param);
 
     if (g_param_type == G_TYPE_BOOLEAN && (strstr (option_entry->long_name,
-                                                   "enable")));
+                                                   "enable")))
       option_entry->flags = G_OPTION_FLAG_OPTIONAL_ARG;
     
     option_entry->arg = G_OPTION_ARG_CALLBACK;
