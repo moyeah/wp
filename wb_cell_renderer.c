@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <webkit2/webkit2.h>
 
 #include "wb_cell_renderer.h"
@@ -31,7 +32,7 @@ struct _WbCellRendererClass
   GtkCellRendererClass parent;
 };
 
-static guint signal[LAST_SIGNAL] = { 0 };
+static guint signals[LAST_SIGNAL] = { 0 };
 
 G_DEFINE_TYPE (WbCellRenderer, wb_cell_renderer, GTK_TYPE_CELL_RENDERER)
 
@@ -53,7 +54,8 @@ cell_renderer_text_edited_cb (WbCellRenderer *renderer,
 static void
 cell_renderer_spin_edited_cb (WbCellRenderer *renderer,
                               const gchar    *path,
-                              const gchar    *new_path)
+                              const gchar    *new_path,
+                              const gchar    *new_text)
 {
   if (!renderer->value)
     return;
@@ -80,14 +82,14 @@ cell_renderer_spin_edited_cb (WbCellRenderer *renderer,
   }
 
   g_value_set_uint (renderer->value, (guint) value);
-  g_signal_emit (renderer, signal[CHANGED], 0, path, renderer->value);
+  g_signal_emit (renderer, signals[CHANGED], 0, path, renderer->value);
 }
 
 static void
 wb_cell_renderer_init (WbCellRenderer *renderer)
 {
   g_object_set (renderer, "mode",
-                GTK_CELL_RENDERER_MODE_ACTIVE, NULL);
+                GTK_CELL_RENDERER_MODE_ACTIVATABLE, NULL);
 
   renderer->toggle = gtk_cell_renderer_toggle_new ();
   g_object_set (G_OBJECT (renderer->toggle),
@@ -213,7 +215,7 @@ wb_cell_renderer_activate (GtkCellRenderer      *cell,
 
   g_value_set_boolean (renderer->value,
                        !g_value_get_boolean (renderer->value));
-  g_signal_emit (renderer, signal[CHANGED], 0, path, renderer->value);
+  g_signal_emit (renderer, signals[CHANGED], 0, path, renderer->value);
 
   return TRUE;
 }
@@ -257,7 +259,7 @@ wb_cell_renderer_render (GtkCellRenderer      *cell,
                          GtkWidget            *widget,
                          const GdkRectangle   *bg_area,
                          const GdkRectangle   *cell_area,
-                         GdkCellRendererState  flags)
+                         GtkCellRendererState  flags)
 {
   GtkCellRenderer *renderer = wb_cell_renderer_get_renderer_for_value (
                                 WB_CELL_RENDERER (cell));
@@ -270,8 +272,131 @@ wb_cell_renderer_render (GtkCellRenderer      *cell,
                                                   cell_area, flags);
 }
 
+static GtkCellEditable*
+wb_cell_renderer_start_editing (GtkCellRenderer      *cell,
+                                GdkEvent             *event,
+                                GtkWidget            *widget,
+                                const gchar          *path,
+                                const GdkRectangle   *bg_area,
+                                const GdkRectangle   *cell_area,
+                                GtkCellRendererState  flags)
+{
+  GtkCellRenderer *renderer = wb_cell_renderer_get_renderer_for_value (
+                                WB_CELL_RENDERER (cell));
+
+  if (!renderer)
+    return NULL;
+
+  if (!GTK_CELL_RENDERER_GET_CLASS (renderer)->start_editing)
+    return NULL;
+
+  return GTK_CELL_RENDERER_GET_CLASS (renderer)->start_editing (renderer,
+                                                                event,
+                                                                widget,
+                                                                path,
+                                                                bg_area,
+                                                                cell_area,
+                                                                flags);
+}
+
 static void
-wb_cell_renderer_start_editing
+wb_cell_renderer_get_preferred_width (GtkCellRenderer *cell,
+                                      GtkWidget       *widget,
+                                      gint            *minimum,
+                                      gint            *natural)
+{
+  GtkCellRenderer *renderer = wb_cell_renderer_get_renderer_for_value (
+                                WB_CELL_RENDERER (cell));
+
+  if (!renderer)
+    return;
+
+  GTK_CELL_RENDERER_GET_CLASS (renderer)->get_preferred_width (renderer,
+                                                               widget,
+                                                               minimum,
+                                                               natural);
+}
+
+static void
+wb_cell_renderer_get_preferred_height (GtkCellRenderer *cell,
+                                       GtkWidget       *widget,
+                                       gint            *minimum,
+                                       gint            *natural)
+{
+  GtkCellRenderer *renderer = wb_cell_renderer_get_renderer_for_value (
+                                WB_CELL_RENDERER (cell));
+
+  if (!renderer)
+    return;
+
+  GTK_CELL_RENDERER_GET_CLASS (renderer)->get_preferred_width (renderer,
+                                                               widget,
+                                                               minimum,
+                                                               natural);
+}
+
+static void
+wb_cell_renderer_get_preferred_width_for_height (GtkCellRenderer *cell,
+                                                 GtkWidget       *widget,
+                                                 gint             height,
+                                                 gint            *minimum,
+                                                 gint            *natural)
+{
+  GtkCellRenderer *renderer = wb_cell_renderer_get_renderer_for_value (
+                                WB_CELL_RENDERER (cell));
+
+  if (!renderer)
+    return;
+
+  GTK_CELL_RENDERER_GET_CLASS (renderer)->get_preferred_width_for_height (
+                                            renderer,
+                                            widget,
+                                            height,
+                                            minimum,
+                                            natural);
+}
+
+static void
+wb_cell_renderer_get_preferred_height_for_width (GtkCellRenderer *cell,
+                                                 GtkWidget       *widget,
+                                                 gint             width,
+                                                 gint            *minimum,
+                                                 gint            *natural)
+{
+  GtkCellRenderer *renderer = wb_cell_renderer_get_renderer_for_value (
+                                WB_CELL_RENDERER (cell));
+
+  if (!renderer)
+    return;
+
+  GTK_CELL_RENDERER_GET_CLASS (renderer)->get_preferred_height_for_width (
+                                            renderer,
+                                            widget,
+                                            width,
+                                            minimum,
+                                            natural);
+}
+
+static void
+wb_cell_renderer_get_aligned_area (GtkCellRenderer      *cell,
+                                   GtkWidget            *widget,
+                                   GtkCellRendererState  flags,
+                                   const GdkRectangle   *cell_area,
+                                   GdkRectangle         *aligned_area)
+{
+  GtkCellRenderer *renderer = wb_cell_renderer_get_renderer_for_value (
+                                WB_CELL_RENDERER (cell));
+
+  if (!renderer)
+    return;
+
+  GTK_CELL_RENDERER_GET_CLASS (renderer)->get_aligned_area (renderer,
+                                                            widget,
+                                                            flags,
+                                                            cell_area,
+                                                            aligned_area);
+}
+
 
 static void
 wb_cell_renderer_class_init (WbCellRendererClass *klass)
@@ -286,4 +411,44 @@ wb_cell_renderer_class_init (WbCellRendererClass *klass)
   renderer_class->activate = wb_cell_renderer_activate;
   renderer_class->render = wb_cell_renderer_render;
   renderer_class->start_editing = wb_cell_renderer_start_editing;
+  renderer_class->get_preferred_width = wb_cell_renderer_get_preferred_width;
+  renderer_class->get_preferred_height = wb_cell_renderer_get_preferred_height;
+  renderer_class->get_preferred_width_for_height =
+    wb_cell_renderer_get_preferred_width_for_height;
+  renderer_class->get_preferred_height_for_width =
+    wb_cell_renderer_get_preferred_height_for_width;
+  renderer_class->get_aligned_area = wb_cell_renderer_get_aligned_area;
+
+  g_object_class_install_property (g_object_class,
+                                   PROP_VALUE,
+                                   g_param_spec_boxed (
+                                     "value",
+                                     "Value",
+                                     "The cell renderer value",
+                                     G_TYPE_VALUE,
+                                     G_PARAM_READWRITE));
+
+  g_object_class_install_property (g_object_class,
+                                   PROP_ADJUSTMENT,
+                                   g_param_spec_boxed (
+                                     "adjustment",
+                                     "Adjustment",
+                                     "The adjustment of spin button",
+                                     GTK_TYPE_ADJUSTMENT,
+                                     G_PARAM_READWRITE));
+
+  signals[CHANGED] =
+    g_signal_new ("changed",
+                  G_TYPE_FROM_CLASS (g_object_class),
+                  G_SIGNAL_RUN_LAST,
+                  0, NULL, NULL,
+                  wb_marshall_VOID_STRING_BOXED,
+                  G_TYPE_NONE, 2,
+                  G_TYPE_STRING, G_TYPE_VALUE);
+}
+
+GtkCellRenderer*
+wb_cell_renderer_new (void)
+{
+  return GTK_CELL_RENDERER (g_object_new (WB_TYPE_CELL_RENDERER, NULL));
 }

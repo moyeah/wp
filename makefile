@@ -1,4 +1,5 @@
-SOURCES = wb_settings_dialog.c \
+SOURCES = wb_cell_renderer.c \
+          wb_settings_dialog.c \
           wb_downloads_bar.c \
           wb_window.c \
           wb.c
