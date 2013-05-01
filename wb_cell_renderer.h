@@ -13,7 +13,7 @@ G_BEGIN_DECLS
 typedef struct _WbCellRenderer      WbCellRenderer;
 typedef struct _WbCellRendererClass WbCellRendererClass;
 
-GType            wb_cell_renderer_get_type (void) G_GNUC_CONST;
+GType            wb_cell_renderer_get_type (void);
 GtkCellRenderer* wb_cell_renderer_new      (void);
 
 G_END_DECLS

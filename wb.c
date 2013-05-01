@@ -265,8 +265,9 @@ main (int argc, char *argv[])
             FALSE);
 #endif /* WEBKIT_INJECTED_BUNDLE_PATH */
 
-  webkit_web_context_set_favicon_database_directory (
-    webkit_web_context_get_default (), NULL);
+// TODO
+//  webkit_web_context_set_favicon_database_directory (
+//    webkit_web_context_get_default (), NULL);
 
   if (uri_arguments)
   {

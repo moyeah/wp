@@ -13,7 +13,7 @@ G_BEGIN_DECLS
 typedef struct _WbSettingsDialog      WbSettingsDialog;
 typedef struct _WbSettingsDialogClass WbSettingsDialogClass;
 
-GType      wb_settings_dialog_get_type (void) G_GNUC_CONST;
+GType      wb_settings_dialog_get_type (void);
 GtkWidget* wb_settings_dialog_new      (WebKitSettings *settings);
 
 G_END_DECLS

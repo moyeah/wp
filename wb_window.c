@@ -90,6 +90,8 @@ forward_item_clicked_cb (WbWindow *window)
 static void
 settings_item_clicked_cb (WbWindow *window)
 {
+// TODO
+#if 0
   if (window->settings_dialog)
   {
     gtk_window_present (GTK_WINDOW (window->settings_dialog));
@@ -103,6 +105,7 @@ settings_item_clicked_cb (WbWindow *window)
                                 GTK_WINDOW (window));
   g_object_add_weak_pointer (G_OBJECT (window->settings_dialog),
                              (gpointer *) &window->settings_dialog);
+#endif
 }
 
 static void
@@ -238,14 +241,16 @@ wb_window_update_navigation_actions (WbWindow              *window,
   gtk_widget_set_sensitive (window->forward_item,
                             webkit_web_view_can_go_forward (window->web_view));
 
-  GList *list = webkit_back_forward_list_get_back_list_with_limit (list, 10);
+  GList *list =
+    webkit_back_forward_list_get_back_list_with_limit (back_forward_list, 10);
   gtk_menu_tool_button_set_menu (
     GTK_MENU_TOOL_BUTTON (window->back_item),
                           wb_window_create_back_forward_menu (window,
                                                               list));
   g_list_free (list);
 
-  list = webkit_back_forward_list_get_forward_list_with_limit (list, 10);
+  list =
+    webkit_back_forward_list_get_forward_list_with_limit (back_forward_list, 10);
   gtk_menu_tool_button_set_menu (
     GTK_MENU_TOOL_BUTTON (window->forward_item),
                           wb_window_create_back_forward_menu (window,
@@ -379,6 +384,8 @@ web_view_create_cb (WebKitWebView *web_view,
   WebKitWebView *new_web_view = WEBKIT_WEB_VIEW (
                                   webkit_web_view_new_with_context (
                                     webkit_web_view_get_context (web_view)));
+  webkit_web_view_set_settings (
+    new_web_view, webkit_web_view_get_settings (web_view));
 
   GtkWidget *new_window = wb_window_new (new_web_view, GTK_WINDOW (window));
   g_signal_connect (new_web_view, "ready-to-show",
@@ -439,7 +446,7 @@ web_view_decide_policy_cb (WebKitWebView            *web_view,
 }
 
 static gboolean
-web_view_premission_request_cb (WebKitWebView           *web_view,
+web_view_permission_request_cb (WebKitWebView           *web_view,
                                 WebKitPermissionRequest *request,
                                 WbWindow                *window)
 {
@@ -484,11 +491,19 @@ update_uri_entry_icon (WbWindow *window)
   GtkEntry *entry = GTK_ENTRY (window->uri_entry);
 
   if (window->favicon)
+  {
     gtk_entry_set_icon_from_pixbuf (entry, GTK_ENTRY_ICON_PRIMARY,
                                     window->favicon);
+    gtk_entry_set_icon_sensitive (entry, GTK_ENTRY_ICON_PRIMARY, TRUE);
+  }
   else
-    gtk_entry_set_icon_from_stock (entry, GTK_ENTRY_ICON_PRIMARY,
-                                   GTK_STOCK_NEW);
+  {
+    GFile *icon_file = g_file_new_for_path ("default_icon.jpg");
+    GIcon *icon = g_file_icon_new (icon_file);
+    g_object_unref (icon_file);
+    gtk_entry_set_icon_from_gicon (entry, GTK_ENTRY_ICON_PRIMARY, icon);
+    gtk_entry_set_icon_sensitive (entry, GTK_ENTRY_ICON_PRIMARY, FALSE);
+  }
 }
 
 static void
@@ -540,10 +555,10 @@ wb_window_finalize (GObject *g_object)
 }
 
 static void
-wb_window_get_property (GObject      *g_object,
-                        guint         prop_id,
-                        const GValue *value,
-                        GParamSpec   *pspec)
+wb_window_get_property (GObject    *g_object,
+                        guint       prop_id,
+                        GValue     *value,
+                        GParamSpec *pspec)
 {
   WbWindow *window = WB_WINDOW (g_object);
 
@@ -586,6 +601,7 @@ wb_window_init (WbWindow *window)
                                default_window_height);
 
   window->uri_entry = gtk_entry_new ();
+  gtk_entry_set_has_frame (GTK_ENTRY (window->uri_entry), FALSE);
   gtk_entry_set_icon_activatable (GTK_ENTRY (window->uri_entry),
                                   GTK_ENTRY_ICON_PRIMARY, FALSE);
   update_uri_entry_icon (window);
@@ -677,8 +693,8 @@ wb_window_constructed (GObject *g_object)
                     G_CALLBACK (web_view_decide_policy_cb),
                     window);
 
-  g_signal_connect (window->web_view, "premission-request",
-                    G_CALLBACK (web_view_premission_request_cb),
+  g_signal_connect (window->web_view, "permission-request",
+                    G_CALLBACK (web_view_permission_request_cb),
                     window);
 
   g_signal_connect (window->web_view, "mouse-target-changed",
@@ -748,7 +764,7 @@ wb_window_class_init (WbWindowClass *klass)
                                      "view", "View",
                                      "The web view of this window",
                                       WEBKIT_TYPE_WEB_VIEW,
-                                      G_PARAM_READWRITE ||
+                                      G_PARAM_READWRITE |
                                         G_PARAM_CONSTRUCT_ONLY));
 }
 
@@ -785,5 +801,5 @@ wb_window_load_uri (WbWindow *window, const gchar *uri)
 
   webkit_web_view_run_javascript (window->web_view,
                                   strstr (uri, "javascript:"),
-				  NULL, NULL, NULL);
+				                          NULL, NULL, NULL);
 }

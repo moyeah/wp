@@ -13,7 +13,7 @@ G_BEGIN_DECLS
 typedef struct _WbDownloadsBar      WbDownloadsBar;
 typedef struct _WbDownloadsBarClass WbDownloadsBarClass;
 
-GType      wb_downloads_bar_get_type     (void) G_GNUC_CONST;
+GType      wb_downloads_bar_get_type     (void);
 GtkWidget* wb_downloads_bar_new          (void);
 void       wb_downloads_bar_add_download (WbDownloadsBar *downloads_bar,
                                           WebKitDownload *download);

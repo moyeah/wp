@@ -13,7 +13,7 @@ G_BEGIN_DECLS
 typedef struct _WbWindow      WbWindow;
 typedef struct _WbWindowClass WbWindowClass;
 
-GType          wb_window_get_type (void) G_GNUC_CONST;
+GType          wb_window_get_type (void);
 GtkWidget*     wb_window_new      (WebKitWebView *web_view,
                                    GtkWindow     *window);
 WebKitWebView* wb_window_get_view (WbWindow      *window);

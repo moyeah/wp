@@ -203,11 +203,11 @@ remaining_time (WbDownload *wb_download)
   gdouble per_byte_time = elapsed_time / current;
   gdouble interval = per_byte_time * (total - current);
 
-  gint hours = (gint) (interval / 3600);
+  int hours = (int) (interval / 3600);
   interval -= hours * 3600;
-  gint mins = (gint) (interval / 60);
+  int mins = (int) (interval / 60);
   interval -= mins * 60;
-  gint secs = (gint) interval;
+  int secs = (int) interval;
 
   if (hours > 0)
   {
