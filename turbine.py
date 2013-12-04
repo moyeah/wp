@@ -23,6 +23,12 @@ class Speed(gtk.Table):
     del entries
 
 class Power(gtk.VBox):
+  def on_add_item_clicked(self, widget, treeView):
+    treeView.append_item()
+
+  def on_remove_item_clicked(self, widget, treeView):
+    treeView.remove_item()
+
   def __init__(self):
     gtk.VBox.__init__(self)
     self.set_border_width(5)
@@ -33,17 +39,20 @@ class Power(gtk.VBox):
     buttonBox.set_spacing(5)
     self.pack_start(buttonBox, False, False)
 
-    buttons = [gtk.STOCK_ADD, gtk.STOCK_DELETE]
-    for button in buttons:
-      button = gtk.Button(stock=button)
-      buttonBox.add(button)
-  
     columns = ["u [m/s]", "P(u) [kW]"]
     columnsEnum = (COLUMN_SPEED, COLUMN_POWER) = range(2)
+    treeView = wp.EditableTreeView(columns, columnsEnum)
+    self.pack_start(treeView)
 
-    self.pack_start(wp.EditableTreeView(columns, columnsEnum))
+    button = gtk.Button(stock=gtk.STOCK_ADD)
+    button.connect("clicked", self.on_add_item_clicked, treeView)
+    buttonBox.add(button)
 
-    del buttonBox, buttons, button, columns, columnsEnum
+    button = gtk.Button(stock=gtk.STOCK_REMOVE)
+    button.connect("clicked", self.on_remove_item_clicked, treeView)
+    buttonBox.add(button)
+
+    del buttonBox, button, columns, columnsEnum, treeView
 
 class Turbine(gtk.VBox):
   def __init__(self):
