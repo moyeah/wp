@@ -6,6 +6,7 @@ import itertools
 from math import *
 
 import wp_utils as wp
+import wp_graph as wpg
 
 class Speed(gtk.Table):
   def __init__(self):
@@ -21,10 +22,10 @@ class Speed(gtk.Table):
       wp.Entry(entry, self, top_attach=ta)
       ta += 1
 
-    del entries
+    del entries, entry, ta
 
 class Power(gtk.VBox):
-  def on_cell_edited(self, cell, path_string, new_text, model):
+  def on_cell_edited(self, cell, path_string, new_text, model, pixbuf):
     iter = model.get_iter_from_string(path_string)
     path = model.get_path(iter)[0]
     column = cell.get_data("column")
@@ -32,9 +33,11 @@ class Power(gtk.VBox):
     try:
       value = fabs(float(eval(new_text)))
       model.set(iter, column, str(value))
+      pixbuf.set_property("visible", False)
       del value
     except (SyntaxError, NameError, TypeError, ValueError):
       model.set(iter, column, new_text)
+      pixbuf.set_property("visible", True)
 
     del iter, path, column
 
@@ -64,8 +67,8 @@ class Power(gtk.VBox):
     del buttonBox, columnsEnum, treeView
 
 class Turbine(gtk.VBox):
-  def on_plot_clicked(self, widget):
-    pass
+  def on_plot_clicked(self, widget, data):
+    wpg.Graph(range(10), range(10), "Turbine Power Graph")
 
   def __init__(self):
     gtk.VBox.__init__(self) 
@@ -87,7 +90,7 @@ class Turbine(gtk.VBox):
       else:
         box.pack_start(mainFrame, False, False)
 
-    buttonBox = wp.HButtonBox(labels=["_Plot Power Graph"],
+    buttonBox = wp.HButtonBox(labels=["Plot _Power Graph"],
                               signals=[self.on_plot_clicked])
     box.set_border_width(5)
     box.pack_start(buttonBox, False, False)

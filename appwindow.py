@@ -21,6 +21,7 @@ class ApplicationMainWindow(gtk.Window):
     self.set_title(title)
     self.set_default_size(800, 600)
     self.set_border_width(10)
+    self.set_position(gtk.WIN_POS_CENTER)
 
     self.__main_vbox = gtk.VBox()
     self.add(self.__main_vbox)

@@ -38,7 +38,7 @@ class Entry(gtk.Entry):
     self.set_warning()
 
   def isValueOK(self):
-    if(self.get_text_length() < 1 or not self.get_abs_value()):
+    if(not self.get_abs_value()):
       return False
     return True
 
@@ -92,15 +92,16 @@ class EditableTreeView(gtk.ScrolledWindow):
 
     for column, columnEnum in itertools.izip(columns, columnsEnum):
       pixbuf = gtk.CellRendererPixbuf()
-      #pixbuf.set_alignment(1, 0.5)
+      pixbuf.set_data("warning", columnEnum)
       pixbuf.set_property("stock-id", gtk.STOCK_DIALOG_WARNING)
       pixbuf.set_property("stock-size", gtk.ICON_SIZE_MENU)
+      pixbuf.set_property("visible", False)
 
       renderer = gtk.CellRendererText()
       renderer.set_alignment(1, 0.5)
       renderer.set_data("column", columnEnum)
       renderer.set_property("editable", True)
-      renderer.connect("edited", cell_edited_signal, model)
+      renderer.connect("edited", cell_edited_signal, model, pixbuf)
 
       treeViewColumn = gtk.TreeViewColumn(column)
       treeViewColumn.pack_start(pixbuf, False)
