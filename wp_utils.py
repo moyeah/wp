@@ -38,9 +38,7 @@ class Entry(gtk.Entry):
     self.set_warning()
 
   def isValueOK(self):
-    if(self.get_text_length() < 1):
-      return False
-    if(not self.get_abs_value()):
+    if(self.get_text_length() < 1 or not self.get_abs_value()):
       return False
     return True
 
@@ -52,6 +50,7 @@ class Entry(gtk.Entry):
 
   def __init__(self, label_with_mnemonic, table, left_attach=0, top_attach=0):
     gtk.Entry.__init__(self)
+    self.set_alignment(1.0)
 
     label = gtk.Label()
     label.set_alignment(xalign=0.0, yalign=0.5)
@@ -71,10 +70,7 @@ class Entry(gtk.Entry):
     del label
 
 class EditableTreeView(gtk.ScrolledWindow):
-  def on_cell_edited(self, cell, path_string, new_text, model):
-    return
-  
-  def __init__(self, columns, columnsEnum):
+  def __init__(self, columns, columnsEnum, cell_edited_signal):
     gtk.ScrolledWindow.__init__(self)
     self.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
 
@@ -83,7 +79,7 @@ class EditableTreeView(gtk.ScrolledWindow):
     treeview = gtk.TreeView(model)
     self.add(treeview)
 
-    self.__add_columns(treeview, columns, columnsEnum)
+    self.__add_columns(treeview, columns, columnsEnum, cell_edited_signal)
 
     del model, treeview
 
@@ -91,11 +87,12 @@ class EditableTreeView(gtk.ScrolledWindow):
     return gtk.ListStore(gobject.TYPE_STRING,
                          gobject.TYPE_STRING)
 
-  def __add_columns(self, treeview, columns, columnsEnum):
+  def __add_columns(self, treeview, columns, columnsEnum, cell_edited_signal):
     model = treeview.get_model()
 
     for column, columnEnum in itertools.izip(columns, columnsEnum):
       pixbuf = gtk.CellRendererPixbuf()
+      #pixbuf.set_alignment(1, 0.5)
       pixbuf.set_property("stock-id", gtk.STOCK_DIALOG_WARNING)
       pixbuf.set_property("stock-size", gtk.ICON_SIZE_MENU)
 
@@ -103,11 +100,12 @@ class EditableTreeView(gtk.ScrolledWindow):
       renderer.set_alignment(1, 0.5)
       renderer.set_data("column", columnEnum)
       renderer.set_property("editable", True)
-      renderer.set_property("text", columnEnum)
-      renderer.connect("edited", self.on_cell_edited, model)
+      renderer.connect("edited", cell_edited_signal, model)
 
-      treeViewColumn = gtk.TreeViewColumn(column, pixbuf)
+      treeViewColumn = gtk.TreeViewColumn(column)
+      treeViewColumn.pack_start(pixbuf, False)
       treeViewColumn.pack_start(renderer, True)
+      treeViewColumn.set_attributes(renderer, text=columnEnum)
       treeViewColumn.set_resizable(True)
       treeViewColumn.set_alignment(0.5)
 
@@ -128,3 +126,22 @@ class EditableTreeView(gtk.ScrolledWindow):
       model.remove(iter)
 
     del model, iter
+
+class HButtonBox(gtk.HButtonBox):
+  def __init__(self, signals, labels=None, stocks=None, data=None):
+    gtk.HButtonBox.__init__(self)
+    self.set_layout(gtk.BUTTONBOX_END)
+    self.set_spacing(5)
+
+    if stocks is not None:
+      for stock, signal in itertools.izip(stocks, signals):
+        button = gtk.Button(stock=stock)
+        button.connect("clicked", signal, data)
+        self.add(button)
+    else:
+      for label, signal in itertools.izip(labels, signals):
+        button = gtk.Button(label=label)
+        button.connect("clicked", signal, data)
+        self.add(button)
+
+    del button
